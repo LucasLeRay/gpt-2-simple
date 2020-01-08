@@ -451,13 +451,14 @@ def generate(sess,
     if prefix:
         context = tf.compat.v1.placeholder(tf.int32, [batch_size, None])
         context_tokens = enc.encode(prefix)
+        context_tokens = context_tokens[length-1023:]
 
     np.random.seed(seed)
     tf.compat.v1.set_random_seed(seed)
 
     output = sample.sample_sequence(
         hparams=hparams,
-        length=min(length, 1023 - (len(context_tokens) if prefix else 0)),
+        length=length,
         start_token=enc.encoder['<|endoftext|>'] if not prefix else None,
         context=context if prefix else None,
         batch_size=batch_size,
