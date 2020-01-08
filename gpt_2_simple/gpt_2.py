@@ -525,6 +525,7 @@ def get_logits(sess,
     if prefix:
         context = tf.compat.v1.placeholder(tf.int32, [batch_size, None])
         context_tokens = enc.encode(prefix)
+        context_tokens = context_tokens[-1023:]
 
     def step(hparams, tokens, past=None):
         lm_output = model.model(hparams=hparams, X=tokens,
@@ -562,8 +563,8 @@ def get_perplexity(sess,
     Returns perplexity score for given continuation of a given prefix.
     
     Examples:
-    perplexity(sess, model_name="124M", prefix="Hello, my name is", continuation=" James Smith, I am an engineer")  # returns 17.3124
-    perplexity(sess, model_name="124M", prefix="Hello, my name is", continuation=" very else whatever general cat meow.")  # returns 5197.99
+    get_perplexity(sess, model_name="124M", prefix="Hello, my name is", continuation=" James Smith, I am an engineer")  # returns 17.3124
+    get_perplexity(sess, model_name="124M", prefix="Hello, my name is", continuation=" very else whatever general cat meow.")  # returns 5197.99
     """
 
     batch_size=1
@@ -577,14 +578,15 @@ def get_perplexity(sess,
 
     context_tokens = enc.encode(prefix)
 
-    context_size = len(context_tokens)
     continuation_tokens = enc.encode(continuation)
+    continuation_size = len(continuation_tokens)
+    assert continuation_size < 1023
 
     full_sentence = prefix+continuation
 
     logits = get_logits(sess, run_name, checkpoint_dir, model_name, model_dir, full_sentence, all=True)
 
-    logits = logits[context_size-1:-1, :]  # only continuation logits
+    logits = logits[-continuation_size-1:-1, :]  # only continuation logits
     logitmeans = np.mean(logits, axis=1)
     logits = logits - logitmeans[:, None]
     explogits = np.exp(logits)
