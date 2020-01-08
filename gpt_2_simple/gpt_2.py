@@ -502,6 +502,51 @@ def generate(sess,
         return gen_texts
 
 
+def get_logits(sess,
+             run_name='run1',
+             checkpoint_dir='checkpoint',
+             model_name=None,
+             model_dir='models',
+             prefix="<|endoftext|>"):
+
+    batch_size=1
+
+    if model_name:
+        checkpoint_path = os.path.join(model_dir, model_name)
+    else:
+        checkpoint_path = os.path.join(checkpoint_dir, run_name)
+
+    enc = encoder.get_encoder(checkpoint_path)
+    hparams = model.default_hparams()
+    with open(os.path.join(checkpoint_path, 'hparams.json')) as f:
+        hparams.override_from_dict(json.load(f))
+
+    if prefix:
+        context = tf.compat.v1.placeholder(tf.int32, [batch_size, None])
+        context_tokens = enc.encode(prefix)
+
+    def step(hparams, tokens, past=None):
+        lm_output = model.model(hparams=hparams, X=tokens,
+                                past=past, reuse=tf.compat.v1.AUTO_REUSE)
+
+        logits = lm_output['logits'][:, :, :hparams.n_vocab]
+        presents = lm_output['present']
+        presents.set_shape(model.past_shape(
+            hparams=hparams, batch_size=batch_size))
+        return {
+            'logits': logits,
+            'presents': presents,
+        }
+
+    output = step(hparams, context)
+
+    out = sess.run(output, feed_dict={
+                    context: batch_size * [context_tokens]
+                })['logits'][0, -1, :]
+
+    return out
+
+
 def generate_to_file(sess,
                      run_name='run1',
                      checkpoint_dir='checkpoint',
